@@ -1,0 +1,63 @@
+[package]
+name = "tristr-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+vstr = { path = "..", default-features = false, features = ["serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[[bin]]
+name = "roundtrip_cow"
+path = "fuzz_targets/roundtrip_cow.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "serde_parity"
+path = "fuzz_targets/serde_parity.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "map_ord"
+path = "fuzz_targets/map_ord.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "conversions"
+path = "fuzz_targets/conversions.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "repr_three_state"
+path = "fuzz_targets/repr_three_state.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mutation_stress"
+path = "fuzz_targets/mutation_stress.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "repr_mix"
+path = "fuzz_targets/repr_mix.rs"
+test = false
+doc = false
+bench = false

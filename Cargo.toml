@@ -1,0 +1,40 @@
+[package]
+name = "tristr"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.87"
+license = "Apache-2.0"
+description = "24-byte three-state string: inline (23B zero-alloc) / owned (zero-copy Box adoption) / shared (O(1) Arc clone), with in-place mutation, serde and specta support"
+repository = "https://github.com/Tunglies/tristr"
+homepage = "https://github.com/Tunglies/tristr"
+readme = "README.md"
+keywords = ["string", "inline", "cow", "arc", "no-std"]
+categories = ["data-structures", "memory-management", "no-std"]
+exclude = [".github/*", "fuzz/*", ".gitignore"]
+
+[features]
+default = ["std", "serde"]
+std = []
+serde = ["dep:serde"]
+specta = ["dep:specta", "std"]
+stats = []
+
+[dependencies]
+serde = { version = "1", optional = true, default-features = false, features = ["alloc"] }
+specta = { version = "=2.0.0-rc.25", optional = true }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+smol_str = "0.3"
+specta = { version = "=2.0.0-rc.25", features = ["smol_str"] }
+
+[lints.rust]
+# set_ascii_case selects its NEON body via target_arch plus the miri cfg
+# Miri sets at runtime (Miri runs the scalar fallback instead).
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(miri)'] }
+
+[profile.release]
+lto = true
+codegen-units = 1
