@@ -25,6 +25,7 @@ use core::ptr;
 
 const INLINE_CAP: usize = 23;
 const TAG_OFFSET: usize = 23;
+const HEAP_PAD: usize = TAG_OFFSET - core::mem::size_of::<*const str>();
 const INLINE_FLAG: u8 = 0x80;
 const INLINE_LEN: u8 = 0x7f;
 /// Tag byte marking the owned (`Box<str>`) variant.
@@ -48,7 +49,7 @@ struct Inline {
 }
 
 /// Heap variant (shared): the `Arc<str>`'s *data* pointer (from
-/// `Arc::into_raw`) as a fat `*const str` plus 7 bytes of padding that are
+/// `Arc::into_raw`) as a fat `*const str` plus padding bytes that are
 /// never read or written, and a tag byte at offset 23 (always 0, encoding
 /// "heap"). Storing the data pointer instead of the `Arc` handle puts
 /// (data pointer, length) at offset 0 for both heap variants, so `deref`
@@ -63,7 +64,7 @@ struct Inline {
 #[repr(C)]
 struct Long {
     raw: *const str,
-    pad: [MaybeUninit<u8>; 7],
+    pad: [MaybeUninit<u8>; HEAP_PAD],
     tag: u8,
 }
 
@@ -91,14 +92,18 @@ const _: () = {
 /// Owned variant: a `Box<str>` adopted zero-copy from an exact-capacity
 /// `String` via `From<String>`. Owned values mutate in place with zero
 /// allocation; cloning deep-copies (the clone itself is shared and O(1) to
-/// clone again). Same 16B fat-pointer shape as the `Long` variant.
+/// clone again). Same fat-pointer shape as the `Long` variant.
 #[repr(C)]
 struct Boxed {
     inner: ManuallyDrop<alloc::boxed::Box<str>>,
-    pad: [MaybeUninit<u8>; 7],
+    pad: [MaybeUninit<u8>; HEAP_PAD],
     tag: u8, // BOXED_TAG
 }
 
+#[cfg_attr(
+    all(target_pointer_width = "32", target_endian = "little"),
+    repr(align(8))
+)]
 union Repr {
     inline: Inline,
     long: ManuallyDrop<Long>,   // tag 0: shared Arc<str>
@@ -249,7 +254,7 @@ impl TriStr {
         TriStr(Repr {
             long: ManuallyDrop::new(Long {
                 raw: Arc::into_raw(arc),
-                pad: [MaybeUninit::uninit(); 7],
+                pad: [MaybeUninit::uninit(); HEAP_PAD],
                 tag: 0,
             }),
         })
@@ -274,7 +279,7 @@ impl TriStr {
         TriStr(Repr {
             boxed: ManuallyDrop::new(Boxed {
                 inner: ManuallyDrop::new(b),
-                pad: [MaybeUninit::uninit(); 7],
+                pad: [MaybeUninit::uninit(); HEAP_PAD],
                 tag: BOXED_TAG,
             }),
         })
@@ -763,7 +768,7 @@ impl From<&str> for TriStr {
                     w2 = tag_word;
                 }
             }
-            // SAFETY: [u64; 3] and Repr are both 24 bytes and 8-aligned, and
+            // SAFETY: [u64; 3] and Repr are both 24 bytes, and
             // every byte of `words` is initialized. Only the `inline` field
             // is ever read while the tag byte says inline (u8 payload and
             // tag have no validity constraints), so no inactive-variant
@@ -1176,6 +1181,13 @@ mod tests {
     }
 
     #[test]
+    fn size_and_alignment() {
+        assert_eq!(core::mem::size_of::<TriStr>(), 24);
+        assert_eq!(core::mem::align_of::<TriStr>(), 8);
+    }
+
+    #[test]
+    #[cfg(target_pointer_width = "64")]
     fn size_matches_std_string() {
         assert_eq!(
             core::mem::size_of::<TriStr>(),

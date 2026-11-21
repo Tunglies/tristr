@@ -4,6 +4,8 @@ A 24-byte string: 23 bytes inline, shared `Arc` copy-on-write beyond that,
 owned `Box` adoption for exact-capacity `String` conversions.
 
 `size_of::<tristr::TriStr>() == size_of::<String>() == 24` on 64-bit targets.
+On 32-bit little-endian targets (including ARMv7), `TriStr` remains 24 bytes
+with 8-byte alignment and 23 bytes of inline capacity; `String` is 12 bytes.
 
 ## Why
 
@@ -97,8 +99,9 @@ tristr = { version = "0.1", features = ["stats"] }
 Three `#[repr(C)]` union variants share a tag byte at offset 23:
 
 - **inline**: `[u8; 23]` payload + tag `0x80 | len` — no heap for ≤ 23 bytes.
-- **owned**: `Box<str>` (16-byte fat pointer) — adopted zero-copy from
-  exact-capacity `String`s and from deserialization of long strings.
+- **owned**: `Box<str>` (16-byte fat pointer on 64-bit targets, 8-byte on 32-bit) —
+  adopted zero-copy from exact-capacity `String`s and from deserialization of
+  long strings.
 - **shared**: `Arc<str>` stored as a raw data pointer — O(1) clone with a
   branch-free `Deref` (the fat-pointer shape matches `Box<str>`, enabling
   LLVM if-conversion across variants).
